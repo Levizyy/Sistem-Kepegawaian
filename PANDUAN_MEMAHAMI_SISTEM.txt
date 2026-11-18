@@ -1,0 +1,110 @@
+====================================================
+PANDUAN MEMAHAMI SISTEM INFORMASI KEPEGAWAIAN
+====================================================
+
+Ini panduan singkat biar kamu paham alur dan struktur kodenya sendiri,
+supaya siap kalau ditanya pas presentasi/demo ke dosen/guru.
+
+----------------------------------------------------
+1. ALUR KERJA SECARA UMUM
+----------------------------------------------------
+Login (login.php)
+  -> Cek email & password ke tabel `users`
+  -> Kalau cocok & aktif & (kalau perlu) email sudah terverifikasi -> masuk ke Dashboard
+  -> Simpan info user di $_SESSION (id, nama, role)
+
+Dashboard (dashboard.php)
+  -> Tampilkan statistik + menu, disesuaikan dengan role yang login
+  -> Ambil sidebar dari includes/sidebar.php (dipakai berulang di semua halaman)
+
+Kelola User (kelola_user.php + tambah/ubah/hapus_user.php)
+  -> HANYA bisa diakses role admin & super_admin (dicek di baris paling atas file)
+  -> CRUD ke tabel `users`
+
+To Do List (to_do_list.php + tambah/ubah/hapus_tugas.php)
+  -> Semua role bisa akses
+  -> User biasa cuma lihat & kelola tugas miliknya sendiri
+  -> Admin/super_admin bisa lihat & kelola semua tugas
+
+Log Aktivitas (log_aktivitas.php)
+  -> HANYA admin & super_admin
+  -> Menampilkan riwayat dari tabel `log_aktivitas`
+  -> Setiap login/logout/tambah/ubah/hapus (user maupun tugas) tercatat otomatis
+
+----------------------------------------------------
+2. KENAPA ADA "includes/cek_login.php" DI SETIAP HALAMAN?
+----------------------------------------------------
+File ini yang menjaga supaya halaman dalam (dashboard, kelola_user, dst)
+TIDAK BISA diakses kalau belum login. Setiap halaman yang butuh login,
+baris paling atasnya selalu:
+    require_once "includes/cek_login.php";
+
+Kalau session belum ada (belum login), otomatis diarahkan ke login.php.
+
+----------------------------------------------------
+3. KENAPA ADA PENGECEKAN ROLE BERULANG DI BEBERAPA FILE?
+----------------------------------------------------
+Contoh di kelola_user.php:
+    if ($_SESSION['role'] !== 'super_admin' && $_SESSION['role'] !== 'admin') {
+        header("Location: dashboard.php");
+        exit();
+    }
+
+Ini PENTING karena sidebar cuma "menyembunyikan" menu secara visual.
+Kalau user biasa coba akses langsung lewat URL (misal ketik manual
+localhost/sistem_kepegawaian/kelola_user.php), pengecekan inilah yang
+benar-benar menolak aksesnya, bukan cuma sembunyi menu doang.
+
+----------------------------------------------------
+4. KENAPA PAKAI "prepared statement" (mysqli_prepare)?
+----------------------------------------------------
+Supaya aman dari SQL Injection. Contoh BAHAYA (jangan dipakai):
+    $sql = "SELECT * FROM users WHERE email = '$email'";
+    
+Kalau user isi email dengan kode jahat, database bisa dibobol.
+Makanya semua query di sistem ini pakai placeholder "?" dan
+mysqli_stmt_bind_param(), supaya input user tidak pernah langsung
+"disuntik" ke perintah SQL.
+
+----------------------------------------------------
+5. STRUKTUR FOLDER PENTING
+----------------------------------------------------
+config/         -> pengaturan koneksi database & SMTP email
+includes/       -> kode yang dipakai berulang (sidebar, validasi, dll)
+assets/         -> CSS, JS, gambar
+database/       -> file SQL
+uploads/        -> tempat file Excel yang diupload user tersimpan
+dokumentasi/    -> ERD diagram
+
+----------------------------------------------------
+6. CHECKLIST TESTING SEBELUM DIKUMPULKAN
+----------------------------------------------------
+[ ] Login sebagai super_admin -> bisa akses semua menu
+[ ] Login sebagai admin -> bisa akses semua menu KECUALI yang khusus super_admin (kalau ada)
+[ ] Login sebagai user biasa -> menu "Kelola User" & "Log Aktivitas" TIDAK muncul
+[ ] User biasa coba ketik manual URL kelola_user.php -> harus ditolak/redirect
+[ ] Tambah, Ubah, Hapus data User (sebagai admin) -> data berubah di database
+[ ] Tambah, Ubah, Hapus Tugas (sebagai user biasa) -> hanya bisa untuk tugas sendiri
+[ ] Coba akses tugas milik orang lain (ubah_tugas.php?nomor=X) sebagai user biasa -> ditolak
+[ ] Filter status/prioritas di To Do List -> data ke-filter dengan benar
+[ ] Pencarian di Kelola User -> hasil sesuai keyword
+[ ] Pagination -> bisa pindah halaman, data tidak dobel/ke-skip
+[ ] Export ke Excel (User & To Do List) -> file ke-download & bisa dibuka
+[ ] Cetak Laporan -> tampil rapi, tombol print jalan
+[ ] Ganti tema terang/gelap -> berhasil & tersimpan walau refresh
+[ ] Buka di HP (atau resize browser kecil) -> sidebar bisa dibuka/tutup
+[ ] Register akun baru -> data masuk ke database dengan role "user"
+[ ] Login pakai akun yang belum di-approve/verifikasi -> ditolak dengan pesan jelas
+[ ] Lupa Password -> email reset terkirim (kalau SMTP sudah disetup)
+[ ] Ubah Password (sudah login) -> minta password lama dulu, berhasil ganti
+
+----------------------------------------------------
+7. KALAU DITANYA "KENAPA PILIH TEKNOLOGI INI?"
+----------------------------------------------------
+- PHP native (tanpa framework) -> supaya alurnya gampang dijelaskan
+  baris per baris, cocok untuk belajar dasar web programming
+- MySQL -> database relasional standar, mendukung relasi antar
+  tabel (foreign key) seperti yang dipakai di users <-> to_do_list
+  dan users <-> log_aktivitas
+- Session PHP -> menyimpan status login tanpa perlu login ulang
+  setiap pindah halaman
